@@ -1,0 +1,9 @@
+{
+    "email": "seu_email_real",
+    "senha": "sua_senha_real",
+    "empresas": [
+        "Empresa 1",
+        "Empresa 2",
+        "Empresa 3"
+    ]
+}
