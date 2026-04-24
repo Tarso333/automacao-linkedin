@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-import tkinter as tk
-from tkinter import scrolledtext
+import customtkinter as ctk
 import threading
 import json
 import time
@@ -13,27 +12,32 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # =========================
-# CONFIG
+# CONFIGURAÇÃO GERAL
 # =========================
 ARQUIVO_JSON = "dados_linkedin.json"
 ARQUIVO_HISTORICO = "historico.json"
+
+# Configuração do visual do CustomTkinter
+ctk.set_appearance_mode("dark")  # Outras opções se quiser: "dark", "light", "system"
+ctk.set_default_color_theme("blue")  #Outras opções se quiser: "blue", "green", "dark-blue"
 
 # =========================
 # LOG
 # =========================
 def log(msg):
-    area_log.insert(tk.END, msg + "\n")
-    area_log.see(tk.END)
+    area_log.insert("end", msg + "\n")
+    area_log.see("end")
     logging.info(msg)
 
 # =========================
-# UTIL
+# UTILIDADES
 # =========================
 def delay(min=2, max=4):
     time.sleep(random.uniform(min, max))
 
 def salvar_dados():
-    empresas = entry_empresas.get("1.0", tk.END).strip().split("\n")
+    # Pega o texto da CTkTextbox (linha 1, coluna 0 até o final)
+    empresas = entry_empresas.get("1.0", "end-1c").strip().split("\n")
     empresas = [e.strip() for e in empresas if e.strip()]
 
     dados = {
@@ -50,13 +54,17 @@ def carregar_dados():
         with open(ARQUIVO_JSON, "r", encoding="utf-8") as f:
             dados = json.load(f)
 
-        entry_email.insert(0, dados.get("email", ""))
-        entry_senha.insert(0, dados.get("senha", ""))
+        # Preenche os campos se houver dados salvos
+        if "email" in dados:
+            entry_email.insert(0, dados["email"])
+        if "senha" in dados:
+            entry_senha.insert(0, dados["senha"])
 
         empresas = dados.get("empresas", [])
-        entry_empresas.insert("1.0", "\n".join(empresas))
-    except:
-        pass
+        if empresas:
+            entry_empresas.insert("1.0", "\n".join(empresas))
+    except Exception:
+        pass # Se o arquivo não existir ou der erro, segue a vida
 
 # =========================
 # HISTÓRICO
@@ -80,7 +88,7 @@ def salvar_historico(empresa, status):
         json.dump(dados, f, indent=4, ensure_ascii=False)
 
 # =========================
-# AUTOMAÇÃO
+# AUTOMAÇÃO (SELENIUM)
 # =========================
 def executar():
     salvar_dados()
@@ -93,7 +101,7 @@ def executar():
     empresas = dados.get("empresas", [])
 
     if not empresas:
-        log("Nenhuma empresa informada!")
+        log(" Nenhuma empresa informada!")
         return
 
     driver = webdriver.Chrome()
@@ -111,7 +119,7 @@ def executar():
             EC.presence_of_element_located((By.CLASS_NAME, "global-nav__me"))
         )
 
-        log("Login confirmado")
+        log("✔ Login confirmado")
 
         for i, empresa in enumerate(empresas, start=1):
             try:
@@ -149,18 +157,18 @@ def executar():
                     salvar_historico(empresa, "Seguindo")
 
                 except:
-                    log(f"Já segue ou botão não encontrado: {empresa}")
+                    log(f"ℹ Já segue ou botão não encontrado: {empresa}")
                     salvar_historico(empresa, "Já seguia")
 
                 delay(2, 4)
 
             except Exception as e:
-                log(f" Erro na empresa: {empresa}")
+                log(f"Erro na empresa: {empresa}")
                 log(str(e))
                 salvar_historico(empresa, "Erro")
                 continue
 
-        log("✔ Finalizado com sucesso")
+        log("\n✔ Processo finalizado com sucesso!")
 
     except Exception as e:
         log(f"ERRO GERAL: {str(e)}")
@@ -173,61 +181,59 @@ def executar():
 # THREAD
 # =========================
 def iniciar():
-    threading.Thread(target=executar, daemon=True).start()
+    log("Iniciando robô...")
+    # Cria uma thread para o Selenium rodar sem congelar a interface
+    t = threading.Thread(target=executar)
+    t.daemon = True 
+    t.start()
 
 # =========================
-# INTERFACE
+# INTERFACE GRÁFICA (CTK)
 # =========================
-janela = tk.Tk()
+janela = ctk.CTk()
 janela.title("Robô LinkedIn")
-janela.geometry("520x650")
-janela.configure(bg="#f4f6f8")
+janela.geometry("1024x760")
 
-frame = tk.Frame(janela, bg="#f4f6f8")
-frame.pack(pady=10)
+# 1. Título
+titulo = ctk.CTkLabel(janela, text="Informe os dados ao Robô", font=("Segoe UI", 24, "bold"))
+titulo.pack(pady=(30, 20))
 
-tk.Label(frame, text="Automação LinkedIn", font=("Segoe UI", 16, "bold"), bg="#f4f6f8").pack(pady=10)
+# 2. Campos de Entrada (Email e Senha)
+entry_email = ctk.CTkEntry(janela, placeholder_text="Digite seu e-mail do LinkedIn", width=400, height=40)
+entry_email.pack(pady=(0, 15))
 
-def label(text):
-    return tk.Label(frame, text=text, bg="#f4f6f8", anchor="w")
+entry_senha = ctk.CTkEntry(janela, placeholder_text="Digite sua Senha", show="*", width=400, height=40)
+entry_senha.pack(pady=(0, 20))
 
-def entry(show=None):
-    return tk.Entry(frame, width=42, relief="solid", bd=1, show=show)
+# 3. Campo de Empresas
+label_empresas = ctk.CTkLabel(janela, text="Empresas (uma por linha):", font=("Segoe UI", 12))
+label_empresas.pack(anchor="w", padx=100)
 
-label("Email").pack(anchor="w")
-entry_email = entry()
-entry_email.pack(pady=5)
+entry_empresas = ctk.CTkTextbox(janela, width=400, height=120)
+entry_empresas.pack(pady=(0, 20))
 
-label("Senha").pack(anchor="w")
-entry_senha = entry(show="*")
-entry_senha.pack(pady=5)
-
-label("Empresas (uma por linha)").pack(anchor="w")
-entry_empresas = tk.Text(frame, width=42, height=6)
-entry_empresas.pack(pady=5)
-
-tk.Button(
-    frame,
-    text="INICIAR ROBÔ",
-    command=iniciar,
-    bg="#0A66C2",
-    fg="white",
-    font=("Segoe UI", 10, "bold"),
-    padx=10,
-    pady=5
-).pack(pady=10)
-
-area_log = scrolledtext.ScrolledText(
-    frame,
-    width=60,
-    height=15,
-    bg="#1e1e1e",
-    fg="#00ff9c",
-    insertbackground="white",
-    font=("Consolas", 9)
+# 4. Botão Iniciar
+btn_iniciar = ctk.CTkButton(
+    janela, 
+    text="INICIAR ROBÔ", 
+    command=iniciar, 
+    width=400, 
+    height=45, 
+    font=("Segoe UI", 14, "bold"),
+    fg_color="#005582", # Um tom de azul estilo LinkedIn
+    hover_color="#003e5e"
 )
-area_log.pack(pady=10)
+btn_iniciar.pack(pady=(0, 30))
 
+# 5. Área de Logs
+label_logs = ctk.CTkLabel(janela, text="Logs de Execução:", font=("Segoe UI", 12))
+label_logs.pack(anchor="w", padx=100)
+
+area_log = ctk.CTkTextbox(janela, width=400, height=180, text_color="#00ff9c", font=("Consolas", 12))
+area_log.pack(pady=(0, 20))
+
+# 6. Carregar Dados Salvos
 carregar_dados()
 
+# 7. Iniciar a Janela
 janela.mainloop()
